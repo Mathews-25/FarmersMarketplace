@@ -62,7 +62,7 @@ export default function FlashSaleManager({ products, onChanged }) {
     <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 8px #0001', marginBottom: 24 }}>
       <h3 style={{ marginBottom: 12, color: '#333' }}>Flash Sales</h3>
       {msg && (
-        <div style={{ ...s.msg, background: msg.type === 'ok' ? '#d8f3dc' : '#fee', color: msg.type === 'ok' ? '#2d6a4f' : '#c0392b' }}>
+        <div role={msg.type === 'ok' ? 'status' : 'alert'} style={{ ...s.msg, background: msg.type === 'ok' ? '#d8f3dc' : '#fee', color: msg.type === 'ok' ? '#2d6a4f' : '#c0392b' }}>
           {msg.text}
         </div>
       )}

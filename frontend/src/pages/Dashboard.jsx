@@ -1128,7 +1128,7 @@ export default function Dashboard() {
 
       <div style={{ ...s.card, marginBottom: 24 }}>
         <h3 style={{ marginBottom: 12, color: '#333' }}>Flash Sales</h3>
-        {flashSaleMsg && <div style={{ ...s.msg, background: flashSaleMsg.type === 'ok' ? '#d8f3dc' : '#fee', color: flashSaleMsg.type === 'ok' ? '#2d6a4f' : '#c0392b' }}>{flashSaleMsg.text}</div>}
+        {flashSaleMsg && <div role={flashSaleMsg.type === 'ok' ? 'status' : 'alert'} style={{ ...s.msg, background: flashSaleMsg.type === 'ok' ? '#d8f3dc' : '#fee', color: flashSaleMsg.type === 'ok' ? '#2d6a4f' : '#c0392b' }}>{flashSaleMsg.text}</div>}
         <form onSubmit={handleSetFlashSale} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 10, alignItems: 'end' }}>
           <div>
             <label style={s.label}>Product</label>
@@ -1667,6 +1667,7 @@ export default function Dashboard() {
         <h3 style={{ marginBottom: 16, color: '#333' }}>{t('dashboard.myProfile')}</h3>
         {profileMsg && (
           <div
+            role={profileMsg.type === 'ok' ? 'status' : 'alert'}
             style={{
               ...s.msg,
               background: profileMsg.type === 'ok' ? '#d8f3dc' : '#fee',
