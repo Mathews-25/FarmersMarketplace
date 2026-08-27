@@ -2,6 +2,7 @@ const router = require('express').Router();
 const db = require('../db/schema');
 const auth = require('../middleware/auth');
 const { err } = require('../middleware/error');
+const { sanitizeText } = require('../utils/sanitize');
 
 // SSE client registry: userId -> Set of response objects
 const sseClients = new Map();
@@ -11,7 +12,11 @@ function notifyUser(userId, event, data) {
   if (!clients || clients.size === 0) return;
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) {
-    try { res.write(payload); } catch {}
+    try {
+      res.write(payload);
+    } catch {
+      // The client may disconnect between registry lookup and delivery.
+    }
   }
 }
 
@@ -23,12 +28,7 @@ router.post('/', auth, async (req, res) => {
   if (!receiver_id || !content)
     return err(res, 400, 'receiver_id and content are required', 'validation_error');
 
-  const sanitizedContent = content
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .trim();
+  const sanitizedContent = sanitizeText(content);
   if (!sanitizedContent)
     return err(res, 400, 'Message content cannot be empty', 'validation_error');
 
@@ -110,7 +110,11 @@ router.get('/events', auth, (req, res) => {
   sseClients.get(userId).add(res);
 
   const heartbeat = setInterval(() => {
-    try { res.write(': ping\n\n'); } catch {}
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      // The client may disconnect while the heartbeat is being written.
+    }
   }, 30000);
 
   req.on('close', () => {
@@ -168,7 +172,7 @@ router.post('/:conversation_id/read', auth, async (req, res) => {
 
   try {
     await db.query(
-      `UPDATE messages SET read_at = NOW()
+      `UPDATE messages SET read_at = CURRENT_TIMESTAMP
        WHERE sender_id = $1 AND receiver_id = $2 AND read_at IS NULL`,
       [otherUserId, currentUserId]
     );
@@ -195,7 +199,7 @@ router.get('/:userId', auth, async (req, res) => {
 
   try {
     await db.query(
-      `UPDATE messages SET read_at = NOW()
+      `UPDATE messages SET read_at = CURRENT_TIMESTAMP
        WHERE sender_id = $1 AND receiver_id = $2 AND read_at IS NULL`,
       [otherUserId, currentUserId]
     );
@@ -232,7 +236,7 @@ router.patch('/:id/read', auth, async (req, res) => {
 
   try {
     const { rowCount } = await db.query(
-      `UPDATE messages SET read_at = NOW() WHERE id = $1 AND receiver_id = $2 AND read_at IS NULL`,
+      `UPDATE messages SET read_at = CURRENT_TIMESTAMP WHERE id = $1 AND receiver_id = $2 AND read_at IS NULL`,
       [messageId, req.user.id]
     );
     if (rowCount === 0) return err(res, 404, 'Message not found or already read', 'not_found');
