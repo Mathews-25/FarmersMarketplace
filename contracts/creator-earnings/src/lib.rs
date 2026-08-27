@@ -3,7 +3,7 @@
 //! Tracks accumulated earnings per creator (farmer) and allows them to claim
 //! their balance. A platform fee (in basis points) is deducted on each credit.
 //!
-//! Invariants (verified by property tests):
+//! Invariants (verified by deterministic boundary and invariant tests):
 //!   I1 — credited amount is always positive.
 //!   I2 — fee_bps is always ≤ 10_000.
 //!   I3 — farmer_amount + fee_amount == total credited amount (no value created/destroyed).
