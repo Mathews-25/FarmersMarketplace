@@ -163,9 +163,7 @@ impl RewardToken {
 
     pub fn mint(env: Env, to: Address, amount: i128) {
         let minter: Address = env.storage().instance().get(&DataKey::Minter).expect("minter not set");
-        if env.invoker() != minter {
-            panic!("unauthorized: only minter can mint");
-        }
+        minter.require_auth();
         if amount <= 0 {
             panic!("amount must be positive");
         }
