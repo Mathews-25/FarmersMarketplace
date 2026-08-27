@@ -3336,15 +3336,16 @@ mod test {
             let platform = Address::generate(&env);
             env.storage().instance().set(&DataKey::Platform, &platform);
 
-            // order 800 does not exist -> NotFound; order 801 is already settled ->
-            // AlreadySettled. Both fail, but the batch must process both and report each.
+            // Valid releases around an already-settled entry must still succeed.
             let buyer = Address::generate(&env);
             let farmer = Address::generate(&env);
-            let token = Address::generate(&env);
+            let token = env.register(NoopTokenContract, ());
+            store_escrow(&env, 800, buyer.clone(), farmer.clone(), token.clone());
+            store_escrow(&env, 802, buyer.clone(), farmer.clone(), token.clone());
+            env.storage().persistent().set(&DataKey::Token(800), &token);
+            env.storage().persistent().set(&DataKey::Token(802), &token);
             let settled = Escrow {
-                buyer,
-                farmer,
-                token,
+                buyer, farmer, token: token.clone(),
                 amount: 1_000,
                 timeout_unix: 0,
                 status: EscrowStatus::Released,
@@ -3357,15 +3358,18 @@ mod test {
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(801), &settled);
+            env.storage().persistent().set(&DataKey::Token(801), &token);
 
             let mut ids: Vec<u64> = Vec::new(&env);
             ids.push_back(800u64);
             ids.push_back(801u64);
+            ids.push_back(802u64);
 
             let results = EscrowContract::batch_release(env, ids).unwrap();
-            assert_eq!(results.len(), 2);
-            assert_eq!(results.get(0).unwrap(), (800u64, false));
+            assert_eq!(results.len(), 3);
+            assert_eq!(results.get(0).unwrap(), (800u64, true));
             assert_eq!(results.get(1).unwrap(), (801u64, false));
+            assert_eq!(results.get(2).unwrap(), (802u64, true));
         });
     }
 
