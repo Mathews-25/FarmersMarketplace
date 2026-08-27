@@ -43,22 +43,22 @@ async function getApplied(db) {
   return new Set(rows.map((r) => r.name));
 }
 
-function getPendingFiles(applied) {
-  if (!fs.existsSync(MIGRATIONS_DIR)) return [];
+function getPendingFiles(applied, migrationsDir = MIGRATIONS_DIR) {
+  if (!fs.existsSync(migrationsDir)) return [];
   return fs
-    .readdirSync(MIGRATIONS_DIR)
+    .readdirSync(migrationsDir)
     .filter((f) => /^\d+_.+\.sql$/.test(f) && !f.endsWith('.undo.sql'))
     .sort()
     .filter((f) => !applied.has(f));
 }
 
-async function runMigrations(db) {
+async function runMigrations(db, migrationsDir = MIGRATIONS_DIR) {
   await ensureMigrationsTable(db);
   const applied = await getApplied(db);
-  const pending = getPendingFiles(applied);
+  const pending = getPendingFiles(applied, migrationsDir);
 
   for (const file of pending) {
-    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
     await db.exec(sql);
     const p = db.placeholder ? db.placeholder(1) : '$1';
     await db.query(`INSERT INTO migrations (name) VALUES (${p})`, [file]);

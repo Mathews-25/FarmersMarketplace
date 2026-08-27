@@ -1,8 +1,11 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol,
+};
 
 const ADMIN: Symbol = symbol_short!("ADMIN");
+const PENDING_ADMIN: Symbol = symbol_short!("PEND_ADM");
 
 // Conservative TTL bump so offset records don't get archived between writes.
 // Values are in ledgers (~5s each): ~6 days threshold, ~30 days bump.
@@ -76,6 +79,40 @@ impl CarbonOffsetContract {
             .persistent()
             .get(&DataKey::Offset(order_id))
             .expect("offset not found")
+    }
+
+    /// Begin a two-step admin transfer. Only the current admin may propose.
+    pub fn propose_admin(env: Env, new_admin: Address) {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN)
+            .expect("not initialized");
+        admin.require_auth();
+        env.storage().instance().set(&PENDING_ADMIN, &new_admin);
+    }
+
+    /// Complete an admin transfer. Only the proposed address may accept.
+    pub fn accept_admin(env: Env) {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&PENDING_ADMIN)
+            .expect("no pending admin");
+        pending.require_auth();
+        env.storage().instance().set(&ADMIN, &pending);
+        env.storage().instance().remove(&PENDING_ADMIN);
+    }
+
+    /// Replace this contract's WASM. Only the current admin may upgrade.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN)
+            .expect("not initialized");
+        admin.require_auth();
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 }
 
