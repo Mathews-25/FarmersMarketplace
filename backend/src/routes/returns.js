@@ -3,6 +3,7 @@ const db = require('../db/schema');
 const auth = require('../middleware/auth');
 const { burnRewardTokens } = require('../utils/stellar');
 const logger = require('../logger');
+const { sanitizeText } = require('../utils/sanitize');
 
 // POST /api/returns - buyer submits a return request
 router.post('/', auth, async (req, res, next) => {
@@ -32,7 +33,7 @@ router.post('/', auth, async (req, res, next) => {
 
     const { rows: inserted } = await db.query(
       'INSERT INTO returns (order_id, buyer_id, reason) VALUES ($1, $2, $3) RETURNING id',
-      [order_id, req.user.id, reason]
+      [order_id, req.user.id, sanitizeText(reason)]
     );
 
     res.status(201).json({ id: inserted[0].id, message: 'Return request submitted' });
@@ -74,8 +75,17 @@ router.patch('/:id/approve', auth, async (req, res, next) => {
     );
     const ret = returnRows[0];
     if (!ret) return res.status(404).json({ error: 'Return not found' });
+    if (ret.status !== 'pending')
+      return res.status(409).json({ error: 'Return has already been processed', code: 'return_already_processed' });
 
-    await db.query('UPDATE returns SET status = $1 WHERE id = $2', ['approved', ret.id]);
+    // The status predicate makes the transition atomic: only the request that
+    // changes pending → approved may continue to the reward-token burn.
+    const { rows: approvedRows, rowCount: approvedCount } = await db.query(
+      'UPDATE returns SET status = $1 WHERE id = $2 AND status = $3 RETURNING id',
+      ['approved', ret.id, 'pending']
+    );
+    if (!approvedRows[0] && !(approvedCount > 0))
+      return res.status(409).json({ error: 'Return has already been processed', code: 'return_already_processed' });
 
     // #847 — burn reward tokens earned for this order (non-fatal)
     if (ret.stellar_public_key) {
