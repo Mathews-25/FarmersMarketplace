@@ -159,6 +159,10 @@ function getPlatformFeeInfo(amount) {
   return { feePercent, feeAmount, farmerAmount, platformWallet };
 }
 
+function getPathPaymentSendMax(sourceAmount, slippagePercent = 0.5) {
+  return parseFloat((sourceAmount * (1 + slippagePercent / 100)).toFixed(7));
+}
+
 /**
  * Queries Horizon for the best path to receive `destAmount` XLM by spending `sourceAssetCode`.
  * @param {{ sourceAssetCode: string, sourceAssetIssuer?: string, destAmount: number|string }} params
@@ -445,6 +449,7 @@ module.exports = {
   getTransactions,
   generatePaymentLink,
   getPlatformFeeInfo,
+  getPathPaymentSendMax,
   getPathPaymentEstimate,
   pathPayment,
   createClaimableBalance,

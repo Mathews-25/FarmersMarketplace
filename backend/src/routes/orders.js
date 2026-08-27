@@ -29,6 +29,7 @@ const {
   getMemo,
 } = require('../utils/stellar');
 const { estimateCarbonFootprint } = require('../utils/carbon');
+const { getPathPaymentSendMax } = require('../utils/stellar-payments');
 const {
   sendOrderEmails,
   sendLowStockAlert,
@@ -105,7 +106,7 @@ router.get('/path-estimate', async (req, res) => {
       destAmount,
     });
     const slippagePct = parseFloat(process.env.PATH_PAYMENT_SLIPPAGE_PCT ?? '0.5');
-    const sendMax = parseFloat((estimate.sourceAmount * (1 + slippagePct / 100)).toFixed(7));
+    const sendMax = getPathPaymentSendMax(estimate.sourceAmount, slippagePct);
     return res.json({
       success: true,
       source_asset,
@@ -468,7 +469,7 @@ router.post('/', auth, requireEmailVerified, orderRateLimit, validate.order, asy
     } catch {
       return res.status(402).json({ success: false, code: 'no_payment_path', message: 'No payment path found' });
     }
-    const slippageAdjusted = parseFloat((estimate.sourceAmount * (1 + slippagePct / 100)).toFixed(7));
+    const slippageAdjusted = getPathPaymentSendMax(estimate.sourceAmount, slippagePct);
     if (max_source_amount != null && parseFloat(max_source_amount) < estimate.sourceAmount) {
       return res.status(402).json({ success: false, code: 'no_payment_path', message: 'max_source_amount is below the current path rate' });
     }

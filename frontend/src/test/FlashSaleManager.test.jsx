@@ -98,6 +98,7 @@ describe('FlashSaleManager — future date validation (#1032)', () => {
     });
     expect(api.setFlashSale).toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/flash sale set/i);
   });
 
   it('clears the error message when the user corrects the end time', async () => {

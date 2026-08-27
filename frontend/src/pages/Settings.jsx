@@ -60,8 +60,8 @@ function Toast({ toast }) {
   const isOk = toast.type === 'ok';
   return (
     <div
-      role="status"
-      aria-live="polite"
+      role={isOk ? 'status' : 'alert'}
+      aria-live={isOk ? 'polite' : 'assertive'}
       style={{
         position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
         background: isOk ? '#2d6a4f' : '#c0392b', color: '#fff',
@@ -146,7 +146,7 @@ function PasswordChangeForm() {
         )}
 
         {msg && (
-          <div style={{ ...s.err, ...(msg.type === 'ok' ? { color: '#2d6a4f', background: '#d8f3dc' } : {}), marginTop: 10 }}>
+          <div role={msg.type === 'ok' ? 'status' : 'alert'} style={{ ...s.err, ...(msg.type === 'ok' ? { color: '#2d6a4f', background: '#d8f3dc' } : {}), marginTop: 10 }}>
             {msg.text}
           </div>
         )}
