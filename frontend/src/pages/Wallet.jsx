@@ -195,6 +195,11 @@ export default function Wallet() {
       setSseConnected(false);
       reconnectDelay.current = Math.min(reconnectDelay.current * 2, RECONNECT_MAX_MS);
       setReconnecting(true);
+      // The embedded token may have expired mid-stream (a likely cause of the
+      // error); refresh it before reconnecting so we don't loop forever on a stale token.
+      if (typeof api.refresh === 'function') {
+        api.refresh().catch(() => {});
+      }
       reconnectTimer.current = setTimeout(() => {
         connectStream();
       }, reconnectDelay.current);
@@ -363,6 +368,9 @@ export default function Wallet() {
       setStreamsMsg({ type: 'err', text: getStellarErrorMessage(e) || getErrorMessage(e) });
     } finally {
       setStreamActionId(null);
+    }
+  }
+
   async function handleClaim(balanceId) {
     setClaimingId(balanceId);
     try {
