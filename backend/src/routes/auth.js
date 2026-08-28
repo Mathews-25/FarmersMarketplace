@@ -17,14 +17,15 @@ const { err } = require('../middleware/error');
 const logger = require('../logger');
 const { createPerIpRateLimiter } = require('../middleware/rateLimitPerUser');
 const { csrfTokenHandler, generateCsrfToken } = require('../middleware/csrf');
+const { encrypt } = require('../utils/crypto');
 
 const loginRateLimit = createPerIpRateLimiter(
   parseInt(process.env.RATE_LIMIT_LOGIN_MAX || '5', 10),
-  60 * 1000,
+  60 * 1000
 );
 const registerRateLimit = createPerIpRateLimiter(
   parseInt(process.env.RATE_LIMIT_REGISTER_MAX || '3', 10),
-  60 * 1000,
+  60 * 1000
 );
 
 const ACCESS_TOKEN_TTL = '15m';
@@ -123,10 +124,10 @@ async function rotateRefreshToken(userId, oldRawToken) {
 
   // Replay detected: token exists but was already used — nuke the entire family
   if (existing.used) {
-    await db.query(
-      'DELETE FROM refresh_tokens WHERE user_id = $1 AND family_id = $2',
-      [userId, existing.family_id]
-    );
+    await db.query('DELETE FROM refresh_tokens WHERE user_id = $1 AND family_id = $2', [
+      userId,
+      existing.family_id,
+    ]);
     return { reuse: true, userId, familyId: existing.family_id };
   }
 
@@ -191,6 +192,7 @@ router.post('/register', registerRateLimit, validate.register, async (req, res) 
     const hashed = await bcrypt.hash(password, 12);
     const wallet = createWalletFromMnemonic();
     const encryptedMnemonic = await encryptMnemonic(wallet.mnemonic, password);
+    const encryptedSecretKey = await encrypt(wallet.secretKey);
     const referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
 
     let referredBy = null;
@@ -207,7 +209,7 @@ router.post('/register', registerRateLimit, validate.register, async (req, res) 
         hashed,
         role,
         wallet.publicKey,
-        wallet.secretKey,
+        encryptedSecretKey,
         encryptedMnemonic,
         referralCode,
         referredBy,
@@ -428,15 +430,17 @@ router.post('/deactivate', auth, async (req, res) => {
   const { rows } = await db.query('SELECT id FROM users WHERE id = $1', [req.user.id]);
   if (!rows[0]) return err(res, 404, 'User not found', 'not_found');
 
-  await db.query(
-    'UPDATE users SET active = 0, deactivated_at = CURRENT_TIMESTAMP WHERE id = $1',
-    [req.user.id]
-  );
+  await db.query('UPDATE users SET active = 0, deactivated_at = CURRENT_TIMESTAMP WHERE id = $1', [
+    req.user.id,
+  ]);
 
   // Revoke all sessions
   await db.query('DELETE FROM refresh_tokens WHERE user_id = $1', [req.user.id]);
   res.clearCookie('refreshToken', { path: '/api/auth' });
-  res.json({ success: true, message: 'Account deactivated. Your data will be anonymized after 30 days.' });
+  res.json({
+    success: true,
+    message: 'Account deactivated. Your data will be anonymized after 30 days.',
+  });
 });
 
 // DELETE /api/auth/account — self-service account deletion
@@ -608,7 +612,7 @@ router.post('/2fa/verify', auth, validate.verify2FA, async (req, res) => {
     }
 
     // Hash backup codes
-    const hashedBackupCodes = backupCodes.map(code => 
+    const hashedBackupCodes = backupCodes.map((code) =>
       crypto.createHash('sha256').update(code).digest('hex')
     );
 
@@ -635,10 +639,9 @@ router.post('/2fa/verify', auth, validate.verify2FA, async (req, res) => {
  */
 router.get('/2fa/status', auth, async (req, res) => {
   try {
-    const { rows } = await db.query(
-      'SELECT enabled FROM user_2fa_settings WHERE user_id = $1',
-      [req.user.id]
-    );
+    const { rows } = await db.query('SELECT enabled FROM user_2fa_settings WHERE user_id = $1', [
+      req.user.id,
+    ]);
 
     const enabled = rows[0]?.enabled === 1;
     res.json({ enabled });
