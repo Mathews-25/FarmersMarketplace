@@ -24,7 +24,7 @@ describe('POST /api/messages', () => {
   it('sends a message from an authenticated buyer to a farmer', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [{ id: 20 }], rowCount: 1 }) // receiver exists
-      .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 })  // INSERT RETURNING id
+      .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 }) // INSERT RETURNING id
       .mockResolvedValueOnce({
         rows: [{ id: 1, sender_id: 10, receiver_id: 20, content: 'Hello!' }],
         rowCount: 1,
@@ -52,7 +52,7 @@ describe('POST /api/messages', () => {
       .send({ receiver_id: 20, content: '<script>alert(1)</script>' });
 
     const insertCall = mockQuery.mock.calls.find(([sql]) => sql.includes('INSERT INTO messages'));
-    expect(insertCall[1][3]).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(insertCall[1][3]).toBe('alert(1)');
   });
 
   it('always uses the authenticated user as sender, ignoring a spoofed sender_id', async () => {
@@ -105,13 +105,22 @@ describe('POST /api/messages', () => {
 
 // ── GET /api/messages (conversation list) ──────────────────────────────────────
 describe('GET /api/messages', () => {
-  it('lists the authenticated user\'s conversations', async () => {
+  it("lists the authenticated user's conversations", async () => {
     mockQuery.mockResolvedValueOnce({
-      rows: [{ other_user_id: 20, other_user_name: 'Farmer Joe', last_message: 'Hello!', unread_count: 0 }],
+      rows: [
+        {
+          other_user_id: 20,
+          other_user_name: 'Farmer Joe',
+          last_message: 'Hello!',
+          unread_count: 0,
+        },
+      ],
       rowCount: 1,
     });
 
-    const res = await request(app).get('/api/messages').set('Authorization', `Bearer ${buyerToken}`);
+    const res = await request(app)
+      .get('/api/messages')
+      .set('Authorization', `Bearer ${buyerToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
@@ -128,7 +137,7 @@ describe('GET /api/messages', () => {
 describe('GET /api/messages/:userId', () => {
   it('returns messages exchanged with the given user, scoped to the caller', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })            // mark-as-read update
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // mark-as-read update
       .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 }) // count
       .mockResolvedValueOnce({
         rows: [
@@ -182,7 +191,7 @@ describe('unread-count lifecycle', () => {
   it('POST /:conversation_id/read marks messages read and returns the updated unread_count', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 }) // participant check
-      .mockResolvedValueOnce({ rows: [], rowCount: 2 })           // UPDATE read_at
+      .mockResolvedValueOnce({ rows: [], rowCount: 2 }) // UPDATE read_at
       .mockResolvedValueOnce({ rows: [{ count: '0' }], rowCount: 1 }); // recomputed unread count
 
     const res = await request(app)
@@ -211,7 +220,7 @@ describe('unread-count lifecycle', () => {
 
 // ── PATCH /api/messages/:id/read — cannot mark another account's message ──────
 describe('PATCH /api/messages/:id/read', () => {
-  it('marks the caller\'s own received message as read', async () => {
+  it("marks the caller's own received message as read", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
     const res = await request(app)

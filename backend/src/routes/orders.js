@@ -41,6 +41,7 @@ const { getCachedResponse, cacheResponse } = require('../utils/idempotency');
 const { getTierPrice } = require('./coupons');
 const { checkGeoFence, checkCoordinateGeoFence } = require('../utils/geocheck');
 const { broadcastStockUpdate } = require('./products');
+const { couponNowExpression } = require('../utils/couponTime');
 
 // XLM per kg per km
 const SHIPPING_RATE = 0.001;
@@ -169,7 +170,7 @@ async function handleBundleOrder(req, res, bundle_id, address_id, coupon_code, u
   let appliedCoupon = null;
   if (coupon_code) {
     const { rows: cRows } = await db.query(
-      `SELECT * FROM coupons WHERE code = $1 AND farmer_id = $2 AND (expires_at IS NULL OR expires_at > NOW()) AND (max_uses IS NULL OR used_count < max_uses)`,
+      `SELECT * FROM coupons WHERE code = $1 AND farmer_id = $2 AND (expires_at IS NULL OR expires_at > ${couponNowExpression(db)}) AND (max_uses IS NULL OR used_count < max_uses)`,
       [coupon_code.trim().toUpperCase(), bundle.farmer_id]
     );
     if (!cRows[0]) return err(res, 400, 'Invalid or expired coupon', 'invalid_coupon');
@@ -406,7 +407,7 @@ router.post('/', auth, requireEmailVerified, orderRateLimit, validate.order, asy
   let appliedCoupon = null;
   if (coupon_code) {
     const { rows: cRows } = await db.query(
-      `SELECT * FROM coupons WHERE code = $1 AND farmer_id = $2 AND (expires_at IS NULL OR expires_at > NOW()) AND (max_uses IS NULL OR used_count < max_uses)`,
+      `SELECT * FROM coupons WHERE code = $1 AND farmer_id = $2 AND (expires_at IS NULL OR expires_at > ${couponNowExpression(db)}) AND (max_uses IS NULL OR used_count < max_uses)`,
       [coupon_code.trim().toUpperCase(), product.farmer_id]
     );
     if (!cRows[0]) return err(res, 400, 'Invalid or expired coupon', 'invalid_coupon');
@@ -1022,4 +1023,5 @@ router.get('/:id/carbon', auth, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.couponNowExpression = () => couponNowExpression(db);
 module.exports.broadcastOrderUpdate = broadcastOrderUpdate;
