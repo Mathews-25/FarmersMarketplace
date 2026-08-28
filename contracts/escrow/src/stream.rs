@@ -89,7 +89,9 @@ pub fn compute_surplus(stream: &PaymentStream, now: u64, new_rate: i128) -> i128
     let accrued = get_accrued_amount(stream, now);
     let remaining_deposit = stream.deposit - accrued;
     let remaining_time = stream.end_time.saturating_sub(now) as i128;
-    let consumable = remaining_time * new_rate;
+    let consumable = remaining_time
+        .checked_mul(new_rate)
+        .expect("remaining_time * new_rate overflowed i128");
     if consumable < remaining_deposit {
         remaining_deposit - consumable
     } else {
@@ -405,7 +407,12 @@ pub fn increase_rate_per_second(
     // Compute required deposit for the higher rate through end_time.
     let remaining_time = stream.end_time.saturating_sub(now) as i128;
     let rate_increase = new_rate - stream.rate_per_second;
-    let required_additional = remaining_time * rate_increase;
+    // Checked to fail cleanly (before any token transfer or storage write
+    // below) rather than risk an unhandled overflow panic partway through
+    // a state-changing call. (#1228)
+    let required_additional = remaining_time
+        .checked_mul(rate_increase)
+        .expect("remaining_time * rate_increase overflowed i128");
 
     assert!(
         additional_deposit >= required_additional,
