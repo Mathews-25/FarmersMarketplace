@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const jwt = require('jsonwebtoken');
 const db = require('../db/schema');
 const auth = require('../middleware/auth');
 const { err } = require('../middleware/error');
@@ -96,8 +97,18 @@ router.get('/unread-count', auth, async (req, res) => {
 });
 
 // GET /api/messages/events — SSE stream, delivers new_message events to authenticated user only
-router.get('/events', auth, (req, res) => {
-  const userId = req.user.id;
+// Browser EventSource can't set an Authorization header, so this also accepts ?token= as a fallback
+// (same pattern as /orders/stream) while still supporting the header for non-browser/API clients.
+router.get('/events', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1] || req.query.token;
+  if (!token) return err(res, 401, 'No token provided', 'missing_token');
+  let user;
+  try {
+    user = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return err(res, 401, 'Invalid token', 'invalid_token');
+  }
+  const userId = user.id;
 
   res.set({
     'Content-Type': 'text/event-stream',
