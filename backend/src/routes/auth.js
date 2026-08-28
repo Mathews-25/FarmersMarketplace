@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const db = require('../db/schema');
+const { currentTimestamp } = require('../db/dialect');
 const {
   createWalletFromMnemonic,
   deriveKeypairFromMnemonic,
@@ -611,12 +612,13 @@ router.post('/2fa/verify', auth, validate.verify2FA, async (req, res) => {
       crypto.createHash('sha256').update(code).digest('hex')
     );
 
-    // Store 2FA settings
+    // Store 2FA settings. SQLite uses datetime('now'); PostgreSQL uses NOW().
+    const nowExpression = currentTimestamp(db.isPostgres);
     await db.query(
       `INSERT INTO user_2fa_settings (user_id, totp_secret, backup_codes, enabled, created_at)
-       VALUES ($1, $2, $3, 1, NOW())
+       VALUES ($1, $2, $3, 1, ${nowExpression})
        ON CONFLICT (user_id) DO UPDATE SET
-       totp_secret = $2, backup_codes = $3, enabled = 1, updated_at = NOW()`,
+       totp_secret = $2, backup_codes = $3, enabled = 1, updated_at = ${nowExpression}`,
       [req.user.id, secret, JSON.stringify(hashedBackupCodes)]
     );
 
@@ -652,8 +654,9 @@ router.get('/2fa/status', auth, async (req, res) => {
  */
 router.post('/2fa/disable', auth, async (req, res) => {
   try {
+    const nowExpression = currentTimestamp(db.isPostgres);
     await db.query(
-      'UPDATE user_2fa_settings SET enabled = 0, updated_at = NOW() WHERE user_id = $1',
+      `UPDATE user_2fa_settings SET enabled = 0, updated_at = ${nowExpression} WHERE user_id = $1`,
       [req.user.id]
     );
 
