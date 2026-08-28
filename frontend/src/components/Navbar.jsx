@@ -219,6 +219,7 @@ export default function Navbar() {
         >
           <option value="en">EN</option>
           <option value="sw">SW</option>
+          <option value="ar">AR</option>
         </select>
       </div>
     </nav>
