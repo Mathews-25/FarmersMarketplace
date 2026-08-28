@@ -118,6 +118,7 @@ export default function CouponManager() {
 
       {couponMsg && (
         <div
+          role="alert"
           style={{
             ...s.msg,
             background: couponMsg.type === 'ok' ? '#d8f3dc' : '#fee',
@@ -131,8 +132,9 @@ export default function CouponManager() {
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10, marginBottom: 12 }}>
           <div>
-            <label style={s.label}>Code</label>
+            <label style={s.label} htmlFor="coupon-code">Code</label>
             <input
+              id="coupon-code"
               style={s.input}
               placeholder="e.g. SUMMER10"
               value={couponForm.code}
@@ -142,8 +144,9 @@ export default function CouponManager() {
             />
           </div>
           <div>
-            <label style={s.label}>Type</label>
+            <label style={s.label} htmlFor="coupon-type">Type</label>
             <select
+              id="coupon-type"
               style={s.input}
               value={couponForm.discount_type}
               onChange={(e) => setCouponForm((f) => ({ ...f, discount_type: e.target.value }))}
@@ -153,8 +156,9 @@ export default function CouponManager() {
             </select>
           </div>
           <div>
-            <label style={s.label}>Value</label>
+            <label style={s.label} htmlFor="coupon-value">Value</label>
             <input
+              id="coupon-value"
               style={s.input}
               type="number"
               min="0.01"
@@ -166,8 +170,9 @@ export default function CouponManager() {
             />
           </div>
           <div>
-            <label style={s.label}>Max uses <span style={{ color: '#aaa', fontWeight: 400 }}>(optional)</span></label>
+            <label style={s.label} htmlFor="coupon-max-uses">Max uses <span style={{ color: '#aaa', fontWeight: 400 }}>(optional)</span></label>
             <input
+              id="coupon-max-uses"
               style={s.input}
               type="number"
               min="1"
@@ -178,8 +183,9 @@ export default function CouponManager() {
             />
           </div>
           <div>
-            <label style={s.label}>Expires at <span style={{ color: '#aaa', fontWeight: 400 }}>(optional)</span></label>
+            <label style={s.label} htmlFor="coupon-expires-at">Expires at <span style={{ color: '#aaa', fontWeight: 400 }}>(optional)</span></label>
             <input
+              id="coupon-expires-at"
               style={s.input}
               type="datetime-local"
               value={couponForm.expires_at}

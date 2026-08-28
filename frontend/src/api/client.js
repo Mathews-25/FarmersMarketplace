@@ -373,6 +373,9 @@ export const api = {
   signPendingTx: (txId) => request(`/cooperatives/transactions/${txId}/sign`, { method: 'POST' }),
   getPendingTxs: (coopId) => request(`/cooperatives/${coopId}/pending`),
   // Coupons
+  getMyCoupons: () => request('/coupons'),
+  createCoupon: (body) => request('/coupons', { method: 'POST', body }),
+  deleteCoupon: (id) => request(`/coupons/${id}`, { method: 'DELETE' }),
   validateCoupon: (body) => request('/coupons/validate', { method: 'POST', body }),
 
   // Platform fee
