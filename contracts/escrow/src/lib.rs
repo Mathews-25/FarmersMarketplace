@@ -1,17 +1,13 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env};
-mod errors;
-
-use errors::EscrowError;
-use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
-#[cfg(test)]
-extern crate std;
-
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Bytes,
     BytesN, Env, IntoVal, Map, TryFromVal, Val, Vec,
 };
+
+#[cfg(test)]
+extern crate std;
+
 mod stream;
 mod validate_id;
 
@@ -90,7 +86,6 @@ pub enum EscrowError {
     SubmissionWindowClosed = 20,
     /// Auto-release time has not yet been reached. (#878)
     AutoReleaseNotReached  = 21,
-    AutoReleaseNotReached = 21,
     /// Cooperative signer configuration exceeds maximum allowed. (#979)
     TooManyCoopSigners     = 22,
 }
@@ -556,7 +551,12 @@ impl EscrowContract {
     ///
     /// Uses the token stored in the escrow record (#683).
     /// On successful release, attempts to mint reward tokens for the buyer (#851).
-    pub fn release(env: Env, order_id: u64, platform_fee_bps: u32) -> Result<(), EscrowError> {
+    pub fn release(
+        env: Env,
+        order_id: u64,
+        platform_fee_bps: u32,
+        caller: Address,
+    ) -> Result<(), EscrowError> {
         if platform_fee_bps > 1000 {
             return Err(EscrowError::InvalidAmount);
         }
@@ -569,12 +569,11 @@ impl EscrowContract {
 
         // #839: Only the buyer or the platform admin may release; farmer may not.
         let admin_opt: Option<AdminTransfer> = env.storage().instance().get(&DataKey::Admin);
-        let invoker = env.invoker();
         let buyer_clone = escrow.buyer.clone();
-        let is_buyer = invoker == buyer_clone;
+        let is_buyer = caller == buyer_clone;
         let is_admin = admin_opt
             .as_ref()
-            .map(|a| invoker == a.current_admin)
+            .map(|a| caller == a.current_admin)
             .unwrap_or(false);
 
         if !is_buyer && !is_admin {
@@ -1134,7 +1133,7 @@ impl EscrowContract {
     ///
     /// Callable by the buyer, farmer, or the Platform/Arbitrator role (admin).
     /// Returns the ledger sequence the snapshot was stored under.
-    pub fn take_snapshot(env: Env, order_id: u64) -> Result<u64, EscrowError> {
+    pub fn take_snapshot(env: Env, order_id: u64, caller: Address) -> Result<u64, EscrowError> {
         let escrow: Escrow = env
             .storage()
             .persistent()
@@ -1147,7 +1146,7 @@ impl EscrowContract {
             .get(&DataKey::Admin)
             .ok_or(EscrowError::Unauthorized)?;
 
-        let caller = env.invoker();
+        caller.require_auth();
         let is_authorized = caller == escrow.buyer
             || caller == escrow.farmer
             || caller == admin_transfer.current_admin;
@@ -3491,7 +3490,7 @@ mod test {
             let token = Address::generate(&env);
             store_escrow(&env, 900, buyer.clone(), farmer, token);
 
-            let seq = EscrowContract::take_snapshot(env.clone(), 900).unwrap();
+            let seq = EscrowContract::take_snapshot(env.clone(), 900, buyer.clone()).unwrap();
             let snap = EscrowContract::get_snapshot(env, 900, seq).unwrap();
             assert_eq!(snap.buyer, buyer);
             assert_eq!(snap.amount, 1_000_0000);
@@ -3515,8 +3514,8 @@ mod test {
         let contract_id = env.register(EscrowContract, ());
         env.mock_all_auths();
         env.clone().as_contract(&contract_id, || {
-            setup_admin_for(&env);
-            let result = EscrowContract::take_snapshot(env, 12345);
+            let admin = setup_admin_for(&env);
+            let result = EscrowContract::take_snapshot(env, 12345, admin);
             assert_eq!(result, Err(EscrowError::NotFound));
         });
     }
@@ -3531,17 +3530,17 @@ mod test {
         let admin = setup_admin_for(&env);
         store_escrow(&env, 902, buyer.clone(), farmer.clone(), token);
 
-        let seq_by_admin = EscrowContract::take_snapshot(env.clone(), 902).unwrap();
+        let seq_by_admin = EscrowContract::take_snapshot(env.clone(), 902, admin.clone()).unwrap();
         let snap = EscrowContract::get_snapshot(env.clone(), 902, seq_by_admin).unwrap();
         assert_eq!(snap.buyer, buyer);
 
         store_escrow(&env, 903, buyer.clone(), farmer.clone(), token);
-        let seq_by_buyer = EscrowContract::take_snapshot(env.clone(), 903).unwrap();
+        let seq_by_buyer = EscrowContract::take_snapshot(env.clone(), 903, buyer.clone()).unwrap();
         let snap = EscrowContract::get_snapshot(env.clone(), 903, seq_by_buyer).unwrap();
         assert_eq!(snap.farmer, farmer);
 
         store_escrow(&env, 904, buyer.clone(), farmer.clone(), token);
-        let seq_by_farmer = EscrowContract::take_snapshot(env.clone(), 904).unwrap();
+        let seq_by_farmer = EscrowContract::take_snapshot(env.clone(), 904, farmer.clone()).unwrap();
         let snap = EscrowContract::get_snapshot(env, 904, seq_by_farmer).unwrap();
         assert_eq!(snap.buyer, buyer);
     }
